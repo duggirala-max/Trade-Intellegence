@@ -179,12 +179,18 @@ def build_pdf(articles: list[dict]) -> bytes:
         story.append(Spacer(1, 0.3 * cm))
 
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a3a5c")))
+    story.append(Spacer(1, 0.3 * cm))
+    footer_style = ParagraphStyle("Footer", parent=styles["Normal"], fontSize=9,
+                                  textColor=colors.HexColor("#444444"), alignment=TA_LEFT, leading=14)
+    footer_muted = ParagraphStyle("FooterMuted", parent=styles["Normal"], fontSize=8,
+                                  textColor=colors.HexColor("#aaaaaa"), alignment=TA_LEFT)
+    story.append(Paragraph("With Best Regards,", footer_style))
+    story.append(Paragraph("<b>Saidurga Gowtham Duggirala</b>", footer_style))
+    story.append(Paragraph("Managing Director", footer_style))
+    story.append(Paragraph("Raaya Global UG", footer_style))
+    story.append(Paragraph('<link href="https://www.raayaglobal.de">www.raayaglobal.de</link>', footer_style))
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph(
-        "Generated automatically by Trade Intelligence | Powered by Grok AI",
-        ParagraphStyle("Footer", parent=styles["Normal"], fontSize=8,
-                       textColor=colors.HexColor("#aaaaaa"), alignment=TA_CENTER),
-    ))
+    story.append(Paragraph("Generated automatically by Trade Intelligence | Powered by Grok AI", footer_muted))
 
     doc.build(story)
 
@@ -246,8 +252,17 @@ def _build_html(articles: list[dict]) -> str:
         <tr><td>
           <table width="100%" cellpadding="0" cellspacing="0">{rows}</table>
         </td></tr>
-        <tr><td style="padding:20px 32px;background:#f4f6f8;font-size:11px;color:#aaa;text-align:center;">
-          Generated automatically · Powered by Grok AI · See attached PDF for full report with clickable links
+        <tr><td style="padding:24px 32px;background:#f0f4f8;border-top:1px solid #dde3ea;">
+          <div style="font-size:13px;color:#333;line-height:1.8;">
+            With Best Regards,<br>
+            <strong>Saidurga Gowtham Duggirala</strong><br>
+            Managing Director<br>
+            Raaya Global UG<br>
+            <a href="https://www.raayaglobal.de" style="color:#1a3a5c;">www.raayaglobal.de</a>
+          </div>
+          <div style="margin-top:12px;font-size:10px;color:#aaa;">
+            Generated automatically · Powered by Grok AI · See attached PDF for full report with clickable links
+          </div>
         </td></tr>
       </table>
     </td></tr>
