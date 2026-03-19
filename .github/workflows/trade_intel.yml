@@ -1,0 +1,45 @@
+name: Trade Intelligence Digest
+
+on:
+  schedule:
+    # Optimal schedule for Germany-based reader:
+    # 06:00 UTC = 07:00 AM CET (until end of March) | 08:00 AM CEST (from end of March)
+    # At this time India is already at 11:30 AM IST — morning news cycle is complete.
+    # You receive the digest at the start of your Germany working day with full overnight + Indian morning news.
+    - cron: "0 6 * * *"
+  workflow_dispatch:  # allows manual trigger from GitHub Actions tab
+
+jobs:
+  run-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Trade Intelligence pipeline
+        env:
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          RECIPIENT_CC: ${{ secrets.RECIPIENT_CC }}
+        run: python main.py
