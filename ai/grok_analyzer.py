@@ -51,6 +51,9 @@ def _client() -> OpenAI:
 
 
 def fetch_live_news() -> list[dict]:
+    if not os.environ.get("GROK_API_KEY", ""):
+        print("[Grok Live] GROK_API_KEY not set — skipping.")
+        return []
     client = _client()
     seen_titles: set[str] = set()
     articles = []
@@ -98,6 +101,12 @@ def fetch_live_news() -> list[dict]:
 
 
 def score_article(article: dict) -> dict:
+    if not os.environ.get("GROK_API_KEY", ""):
+        article.update({"relevance_score": 5, "credibility_score": 5, "opportunity_score": 5,
+                        "composite_score": 125, "summary": article.get("description", ""),
+                        "opportunity_note": "N/A — GROK_API_KEY not set.",
+                        "monetisation": "N/A — GROK_API_KEY not set."})
+        return article
     client = _client()
     prompt = SCORE_PROMPT.format(
         title=article.get("title", ""),
