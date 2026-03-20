@@ -2,11 +2,12 @@ name: Trade Intelligence Digest
 
 on:
   schedule:
-    # Optimal schedule for Germany-based reader:
-    # 06:00 UTC = 07:00 AM CET (until end of March) | 08:00 AM CEST (from end of March)
-    # At this time India is already at 11:30 AM IST — morning news cycle is complete.
-    # You receive the digest at the start of your Germany working day with full overnight + Indian morning news.
+    # Morning digest: 06:00 UTC = 07:00 AM CET / 08:00 AM CEST
+    # India is at 11:30 AM IST — full overnight + Indian morning news ready.
     - cron: "0 6 * * *"
+    # Afternoon digest: 13:00 UTC = 14:00 PM CET / 15:00 PM CEST
+    # India is at 18:30 IST — captures European midday + Indian afternoon news cycle.
+    - cron: "0 13 * * *"
   workflow_dispatch:  # allows manual trigger from GitHub Actions tab
 
 jobs:
@@ -37,7 +38,7 @@ jobs:
       - name: Run Trade Intelligence pipeline
         env:
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
-          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}

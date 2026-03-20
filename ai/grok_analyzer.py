@@ -3,8 +3,8 @@ import json
 from openai import OpenAI
 
 
-GROK_BASE_URL = "https://api.x.ai/v1"
-GROK_MODEL = "grok-3-mini"
+GROK_BASE_URL = "https://api.groq.com/openai/v1"
+GROK_MODEL = "llama-3.3-70b-versatile"
 
 LIVE_SEARCH_QUERIES = [
     "India Germany trade news today",
@@ -62,68 +62,24 @@ Rules: plain text only, no markdown headers, no asterisks, no bold tags."""
 
 
 def _client() -> OpenAI:
-    api_key = os.environ.get("GROK_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        raise ValueError("GROK_API_KEY is not set.")
+        raise ValueError("GROQ_API_KEY is not set.")
     return OpenAI(api_key=api_key, base_url=GROK_BASE_URL)
 
 
 def fetch_live_news() -> list[dict]:
-    if not os.environ.get("GROK_API_KEY", ""):
-        print("[Grok Live] GROK_API_KEY not set — skipping.")
-        return []
-    client = _client()
-    seen_titles: set[str] = set()
-    articles = []
-
-    for query in LIVE_SEARCH_QUERIES:
-        try:
-            resp = client.chat.completions.create(
-                model=GROK_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a real-time news retrieval assistant. "
-                            "Search the web for the latest news on the given topic and return "
-                            "a JSON array of up to 5 articles. Each article must have: "
-                            "title, url, source, published_at, description. "
-                            "Return ONLY the JSON array, no markdown."
-                        ),
-                    },
-                    {"role": "user", "content": f"Find the latest news: {query}"},
-                ],
-            )
-            raw = resp.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            items = json.loads(raw)
-            for item in items:
-                title = item.get("title", "")
-                if title and title not in seen_titles:
-                    seen_titles.add(title)
-                    articles.append({
-                        "title": title,
-                        "url": item.get("url", ""),
-                        "source": item.get("source", "Grok Live"),
-                        "published_at": item.get("published_at", ""),
-                        "description": item.get("description", ""),
-                    })
-        except Exception as exc:
-            print(f"[Grok Live] Error for '{query}': {exc}")
-
-    print(f"[Grok Live] Fetched {len(articles)} live articles.")
-    return articles
+    # Groq models do not support live web search — news sourced from RSS and NewsAPI only.
+    print("[AI Live] Skipping live search (not supported by Groq).")
+    return []
 
 
 def score_article(article: dict) -> dict:
-    if not os.environ.get("GROK_API_KEY", ""):
+    if not os.environ.get("GROQ_API_KEY", ""):
         article.update({"relevance_score": 5, "credibility_score": 5, "opportunity_score": 5,
                         "composite_score": 125, "summary": article.get("description", ""),
-                        "opportunity_note": "N/A — GROK_API_KEY not set.",
-                        "monetisation": "N/A — GROK_API_KEY not set."})
+                        "opportunity_note": "N/A — GROQ_API_KEY not set.",
+                        "monetisation": "N/A — GROQ_API_KEY not set."})
         return article
     client = _client()
     prompt = SCORE_PROMPT.format(
@@ -136,12 +92,9 @@ def score_article(article: dict) -> dict:
         resp = client.chat.completions.create(
             model=GROK_MODEL,
             messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
         scores = json.loads(raw)
         article.update(scores)
         article["composite_score"] = (
@@ -172,7 +125,7 @@ def score_all(articles: list[dict]) -> list[dict]:
 
 
 def generate_executive_summary(articles: list[dict]) -> str:
-    if not os.environ.get("GROK_API_KEY", ""):
+    if not os.environ.get("GROQ_API_KEY", ""):
         return ""
     client = _client()
     articles_text = "\n".join(
