@@ -30,7 +30,7 @@ def _date_str() -> str:
 
 # ── PDF builder ───────────────────────────────────────────────────────────────
 
-def build_pdf(articles: list[dict]) -> bytes:
+def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
@@ -118,6 +118,36 @@ def build_pdf(articles: list[dict]) -> bytes:
     ))
     story.append(Spacer(1, 0.3 * cm))
 
+    if executive_summary:
+        exec_header = ParagraphStyle(
+            "ExecHeader",
+            parent=styles["Normal"],
+            fontSize=11,
+            textColor=colors.HexColor("#1a3a5c"),
+            fontName="Helvetica-Bold",
+            spaceAfter=4,
+        )
+        exec_body = ParagraphStyle(
+            "ExecBody",
+            parent=styles["Normal"],
+            fontSize=10,
+            leading=15,
+            textColor=colors.HexColor("#1a3a5c"),
+            backColor=colors.HexColor("#eef4fb"),
+            leftIndent=10,
+            rightIndent=10,
+            spaceBefore=4,
+            spaceAfter=12,
+            borderPad=8,
+        )
+        story.append(Paragraph("📋 Executive Briefing", exec_header))
+        for line in executive_summary.split("\n"):
+            line = line.strip()
+            if line:
+                story.append(Paragraph(line, exec_body))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+        story.append(Spacer(1, 0.2 * cm))
+
     for rank, article in enumerate(articles, start=1):
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
         story.append(Spacer(1, 0.2 * cm))
@@ -176,6 +206,23 @@ def build_pdf(articles: list[dict]) -> bytes:
             story.append(Paragraph("<b>💰 How to Monetise:</b>", label))
             story.append(Paragraph(monetise, monetise_style))
 
+        action_plan = article.get("action_plan", "")
+        if action_plan:
+            action_style = ParagraphStyle(
+                "ActionPlan",
+                parent=styles["Normal"],
+                fontSize=10,
+                leading=14,
+                textColor=colors.HexColor("#1a3a5c"),
+                backColor=colors.HexColor("#fff8e1"),
+                spaceAfter=8,
+                leftIndent=8,
+                rightIndent=8,
+                borderPad=6,
+            )
+            story.append(Paragraph("<b>🎯 Action Plan:</b>", label))
+            story.append(Paragraph(action_plan, action_style))
+
         story.append(Spacer(1, 0.3 * cm))
 
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a3a5c")))
@@ -203,7 +250,7 @@ def build_pdf(articles: list[dict]) -> bytes:
 
 # ── HTML email body ───────────────────────────────────────────────────────────
 
-def _build_html(articles: list[dict]) -> str:
+def _build_html(articles: list[dict], executive_summary: str = "") -> str:
     rows = ""
     for rank, a in enumerate(articles, start=1):
         url = a.get("url", "#")
@@ -212,6 +259,12 @@ def _build_html(articles: list[dict]) -> str:
             f'padding:8px 12px;margin-top:8px;color:#1a5c2a;font-size:13px;">'
             f'<b>💰 How to Monetise:</b><br>{a.get("monetisation","")}</div>'
             if a.get("monetisation") else ""
+        )
+        action_html = (
+            f'<div style="background:#fff8e1;border-left:3px solid #f39c12;'
+            f'padding:8px 12px;margin-top:8px;color:#1a3a5c;font-size:13px;">'
+            f'<b>🎯 Action Plan:</b><br>{a.get("action_plan","")}</div>'
+            if a.get("action_plan") else ""
         )
         rows += f"""
         <tr>
@@ -229,6 +282,7 @@ def _build_html(articles: list[dict]) -> str:
               </tr>
             </table>
             {monetise_html}
+            {action_html}
             <div style="margin-top:8px;font-size:11px;">
               <a href="{url}" style="color:#1155cc;">Read full article →</a>
             </div>
@@ -249,6 +303,10 @@ def _build_html(articles: list[dict]) -> str:
         <tr><td style="padding:16px 32px;background:#f0f4f8;font-size:13px;color:#555;">
           Top <b>{len(articles)}</b> opportunities ranked by AI composite score. Full report attached as PDF.
         </td></tr>
+        {f'''<tr><td style="padding:16px 32px;background:#eef4fb;border-left:4px solid #1a3a5c;">
+          <div style="font-size:13px;font-weight:bold;color:#1a3a5c;margin-bottom:8px;">📋 Executive Briefing</div>
+          <div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-line;">{executive_summary}</div>
+        </td></tr>''' if executive_summary else ''}
         <tr><td>
           <table width="100%" cellpadding="0" cellspacing="0">{rows}</table>
         </td></tr>
@@ -273,7 +331,7 @@ def _build_html(articles: list[dict]) -> str:
 
 # ── Sender ────────────────────────────────────────────────────────────────────
 
-def send_digest(articles: list[dict]) -> None:
+def send_digest(articles: list[dict], executive_summary: str = "") -> None:
     gmail_user = os.environ["GMAIL_USER"]
     gmail_password = os.environ["GMAIL_APP_PASSWORD"]
     recipient = os.environ["RECIPIENT_EMAIL"]
@@ -289,11 +347,11 @@ def send_digest(articles: list[dict]) -> None:
     if cc_list:
         msg["Cc"] = ", ".join(cc_list)
 
-    html_body = _build_html(articles)
+    html_body = _build_html(articles, executive_summary)
     msg.attach(MIMEText(html_body, "html"))
 
     print("[Email] Building PDF...")
-    pdf_bytes = build_pdf(articles)
+    pdf_bytes = build_pdf(articles, executive_summary)
     pdf_filename = f"trade_intel_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
 
     attachment = MIMEBase("application", "octet-stream")

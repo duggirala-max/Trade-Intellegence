@@ -65,9 +65,15 @@ def run() -> None:
     for i, a in enumerate(top_articles, 1):
         print(f"  {i}. [{a.get('composite_score',0):>4}] {a.get('title','')[:70]}")
 
-    # 5. Send
-    print("\n[Step 5] Sending email digest with PDF attachment...")
-    send_digest(top_articles)
+    # 5. Executive summary
+    print("\n[Step 5] Generating executive summary...")
+    executive_summary = grok_analyzer.generate_executive_summary(top_articles)
+    if executive_summary:
+        print("\nExecutive Summary:\n" + executive_summary)
+
+    # 6. Send
+    print("\n[Step 6] Sending email digest with PDF attachment...")
+    send_digest(top_articles, executive_summary)
 
     print("\n[Done] Pipeline completed successfully.")
 

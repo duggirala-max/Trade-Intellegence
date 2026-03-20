@@ -27,7 +27,8 @@ Analyse the news article below and return ONLY a valid JSON object with these ex
   "opportunity_score": <integer 1-10>,
   "summary": "<2-3 sentence factual summary>",
   "opportunity_note": "<1-2 sentences: what trade direction this opens — import to Germany, export to India, or both>",
-  "monetisation": "<Concrete zero/low-capital, brain-work monetisation plan (4-6 sentences). Specify: (1) what role to play (consultant, broker, researcher, advisor, matchmaker, etc.), (2) which specific Indian or European businesses to approach, (3) what exactly to offer them, (4) how to charge (retainer, success fee, per-project), (5) the single first step to take today with no money. Do NOT suggest buying inventory, importing goods yourself, or any capital-intensive action.>"
+  "monetisation": "<Concrete zero/low-capital, brain-work monetisation plan (4-6 sentences). Specify: (1) what role to play (consultant, broker, researcher, advisor, matchmaker, etc.), (2) which specific Indian or European businesses to approach, (3) what exactly to offer them, (4) how to charge (retainer, success fee, per-project), (5) the single first step to take today with no money. Do NOT suggest buying inventory, importing goods yourself, or any capital-intensive action.>",
+  "action_plan": "<Numbered list of exactly 3-5 concrete steps to take TODAY or THIS WEEK. Step 1 must be free and doable in under 30 minutes (e.g. send a cold LinkedIn message, draft a 1-page pitch, search a specific supplier directory). Name real platforms (LinkedIn, Kompass, Alibaba, Germany Trade & Invest, GTAI, Make in India portal), real business types, and real documents. No vague advice — each step must be specific enough to act on immediately.>"
 }}
 
 Scoring guide:
@@ -35,12 +36,29 @@ Scoring guide:
 - credibility_score: How credible is the reporting? (10 = Reuters/FT/DW, 1 = unknown blog)
 - opportunity_score: How actionable is this for a Germany-based individual with no capital, in the next 1-6 months?
 
+If the article is NOT relevant to India-Germany/EU trade (e.g. domestic Indian stocks, unrelated finance, Middle East conflict without trade angle), set relevance_score to 1 and opportunity_score to 1.
+
 Article title: {title}
 Source: {source}
 Description: {description}
 URL: {url}
 
 Return ONLY the JSON object, no markdown fences, no explanation."""
+
+
+EXEC_SUMMARY_PROMPT = """You are a senior trade intelligence analyst writing a daily briefing for a Germany-based trade entrepreneur with no startup capital.
+
+Below are today's top {n} India–Germany/EU trade intelligence articles (titles and opportunity notes only).
+
+Write a concise executive briefing in plain text with exactly this structure:
+1. Two sentences summarising today's overall India-Germany trade landscape.
+2. Between 3 and 5 bullet points (use "• " prefix). Each bullet names ONE specific opportunity and ONE concrete first action.
+3. One final line starting with "TOP ACTION TODAY: " — the single most important thing to do right now, specific and free.
+
+Articles:
+{articles_text}
+
+Rules: plain text only, no markdown headers, no asterisks, no bold tags."""
 
 
 def _client() -> OpenAI:
@@ -151,3 +169,25 @@ def score_all(articles: list[dict]) -> list[dict]:
         print(f"[Grok Score] Scoring {i+1}/{len(articles)}: {article.get('title', '')[:60]}")
         scored.append(score_article(article))
     return scored
+
+
+def generate_executive_summary(articles: list[dict]) -> str:
+    if not os.environ.get("GROK_API_KEY", ""):
+        return ""
+    client = _client()
+    articles_text = "\n".join(
+        f"- {a.get('title', '')} | {a.get('opportunity_note', a.get('description', ''))[:150]}"
+        for a in articles
+    )
+    prompt = EXEC_SUMMARY_PROMPT.format(n=len(articles), articles_text=articles_text)
+    try:
+        resp = client.chat.completions.create(
+            model=GROK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        summary = resp.choices[0].message.content.strip()
+        print(f"[Grok Exec] Executive summary generated ({len(summary)} chars).")
+        return summary
+    except Exception as exc:
+        print(f"[Grok Exec] Error generating executive summary: {exc}")
+        return ""
