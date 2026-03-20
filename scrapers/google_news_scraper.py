@@ -3,12 +3,19 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
 
+# (query, source_region)
 SEARCH_QUERIES = [
-    "India Germany trade news today",
-    "India EU import export opportunity 2025",
-    "India Germany business deal latest",
-    "Germany import India products 2025",
-    "India European Union FTA trade update",
+    # India-perspective
+    ("India Germany trade news today", "India"),
+    ("India EU import export opportunity 2025", "India"),
+    ("India Germany business deal latest", "India"),
+    ("Germany import India products 2025", "India"),
+    ("India European Union FTA trade update", "India"),
+    # EU-perspective
+    ("Germany India business 2025", "EU"),
+    ("EU Asia trade news today", "EU"),
+    ("European Union India trade policy news", "EU"),
+    ("Deutschland Indien Handel aktuell", "EU"),
 ]
 
 HEADERS = {
@@ -24,7 +31,7 @@ def fetch_articles() -> list[dict]:
     seen_urls = set()
     articles = []
 
-    for query in SEARCH_QUERIES:
+    for query, source_region in SEARCH_QUERIES:
         url = f"https://news.google.com/search?q={quote_plus(query)}&hl=en-IN&gl=IN&ceid=IN:en"
         try:
             resp = requests.get(url, headers=HEADERS, timeout=15)
@@ -63,6 +70,7 @@ def fetch_articles() -> list[dict]:
                     "title": title,
                     "url": article_url,
                     "source": source,
+                    "source_region": source_region,
                     "published_at": published,
                     "description": "",
                 })

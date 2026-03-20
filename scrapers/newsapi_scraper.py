@@ -5,15 +5,23 @@ from datetime import datetime, timedelta
 
 NEWSAPI_ENDPOINT = "https://newsapi.org/v2/everything"
 
+# (query, source_region)
 QUERIES = [
-    "India Germany trade import export",
-    "India EU import Germany",
-    "India European Union export Germany",
-    "India EU FTA free trade agreement",
-    "India Germany business opportunity",
-    "India EU tariff customs duty",
-    "Germany import India products",
-    "India export Europe opportunity",
+    # India-perspective
+    ("India Germany trade import export", "India"),
+    ("India EU import Germany", "India"),
+    ("India European Union export Germany", "India"),
+    ("India EU FTA free trade agreement", "India"),
+    ("India Germany business opportunity", "India"),
+    ("India EU tariff customs duty", "India"),
+    ("Germany import India products", "India"),
+    ("India export Europe opportunity", "India"),
+    # EU-perspective
+    ("Germany India trade 2025", "EU"),
+    ("EU India trade agreement news", "EU"),
+    ("European Union Asia trade policy", "EU"),
+    ("Germany export Asia opportunity", "EU"),
+    ("EU India investment news", "EU"),
 ]
 
 
@@ -27,7 +35,7 @@ def fetch_articles() -> list[dict]:
     seen_urls = set()
     articles = []
 
-    for query in QUERIES:
+    for query, source_region in QUERIES:
         params = {
             "q": query,
             "from": from_date,
@@ -48,6 +56,7 @@ def fetch_articles() -> list[dict]:
                         "title": item.get("title", ""),
                         "url": url,
                         "source": item.get("source", {}).get("name", "NewsAPI"),
+                        "source_region": source_region,
                         "published_at": item.get("publishedAt", ""),
                         "description": item.get("description", "") or "",
                     })

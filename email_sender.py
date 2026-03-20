@@ -28,6 +28,20 @@ def _date_str() -> str:
     return datetime.now(timezone.utc).strftime("%d %B %Y")
 
 
+def _split_by_direction(articles: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Split articles into India→EU and EU→India buckets."""
+    india_eu = []
+    eu_india = []
+    for a in articles:
+        direction = a.get("trade_direction", "Both")
+        if direction == "EU→India":
+            eu_india.append(a)
+        else:
+            # India→EU and Both go to the India→EU section
+            india_eu.append(a)
+    return india_eu, eu_india
+
+
 # ── PDF builder ───────────────────────────────────────────────────────────────
 
 def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
@@ -56,6 +70,17 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
         textColor=colors.HexColor("#1a3a5c"),
         spaceBefore=14,
         spaceAfter=4,
+    )
+    section_banner = ParagraphStyle(
+        "SectionBanner",
+        parent=styles["Heading1"],
+        fontSize=15,
+        textColor=colors.white,
+        backColor=colors.HexColor("#1a3a5c"),
+        spaceBefore=18,
+        spaceAfter=8,
+        leftIndent=8,
+        borderPad=6,
     )
     body = ParagraphStyle(
         "Body",
@@ -90,6 +115,30 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
         textColor=colors.HexColor("#1155cc"),
         spaceAfter=2,
     )
+    pitch_style = ParagraphStyle(
+        "Pitch",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor("#5c1a3a"),
+        backColor=colors.HexColor("#fdf0f8"),
+        spaceAfter=8,
+        leftIndent=8,
+        rightIndent=8,
+        borderPad=6,
+    )
+    contact_style = ParagraphStyle(
+        "Contact",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor("#1a3a5c"),
+        backColor=colors.HexColor("#f0f4fb"),
+        spaceAfter=8,
+        leftIndent=8,
+        rightIndent=8,
+        borderPad=6,
+    )
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = tmp.name
@@ -112,8 +161,9 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
 
     story.append(Paragraph(
         f"Top <b>{len(articles)}</b> trade opportunities curated and scored by AI from "
-        "NewsAPI, RSS feeds, Google News, and Grok live search. "
-        "Articles are ranked by a composite score (Relevance × Credibility × Opportunity).",
+        "NewsAPI, RSS feeds (India + EU/German sources), and Google News. "
+        "Articles are ranked by composite score (Relevance × Credibility × Opportunity) "
+        "and grouped by trade direction.",
         body,
     ))
     story.append(Spacer(1, 0.3 * cm))
@@ -148,82 +198,120 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
         story.append(Spacer(1, 0.2 * cm))
 
-    for rank, article in enumerate(articles, start=1):
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
-        story.append(Spacer(1, 0.2 * cm))
+    india_eu, eu_india = _split_by_direction(articles)
 
-        story.append(Paragraph(
-            f"#{rank} — {article.get('title', 'No title')}",
-            section_header,
-        ))
+    def _render_articles(article_list: list[dict], start_rank: int) -> None:
+        for rank, article in enumerate(article_list, start=start_rank):
+            story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+            story.append(Spacer(1, 0.2 * cm))
 
-        story.append(Paragraph(
-            f"Source: <b>{article.get('source', 'Unknown')}</b> &nbsp;|&nbsp; "
-            f"Published: {article.get('published_at', 'N/A')[:10]}",
-            label,
-        ))
+            story.append(Paragraph(
+                f"#{rank} — {article.get('title', 'No title')}",
+                section_header,
+            ))
 
-        url = article.get("url", "")
-        if url:
-            story.append(Paragraph(f'<link href="{url}">{url}</link>', link_style))
+            direction_badge = article.get("trade_direction", "")
+            story.append(Paragraph(
+                f"Source: <b>{article.get('source', 'Unknown')}</b> &nbsp;|&nbsp; "
+                f"Published: {article.get('published_at', 'N/A')[:10]}"
+                + (f" &nbsp;|&nbsp; Direction: <b>{direction_badge}</b>" if direction_badge else ""),
+                label,
+            ))
 
-        score_data = [
-            ["Relevance", "Credibility", "Opportunity", "Composite"],
-            [
-                _score_bar(article.get("relevance_score", 0)),
-                _score_bar(article.get("credibility_score", 0)),
-                _score_bar(article.get("opportunity_score", 0)),
-                str(article.get("composite_score", 0)),
-            ],
-        ]
-        score_table = Table(score_data, colWidths=[4 * cm, 4 * cm, 4 * cm, 3 * cm])
-        score_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3a5c")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cccccc")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f7f9fc"), colors.white]),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
-        story.append(Spacer(1, 0.2 * cm))
-        story.append(score_table)
-        story.append(Spacer(1, 0.25 * cm))
+            url = article.get("url", "")
+            if url:
+                story.append(Paragraph(f'<link href="{url}">{url}</link>', link_style))
 
-        summary = article.get("summary", article.get("description", ""))
-        if summary:
-            story.append(Paragraph("<b>Summary:</b>", label))
-            story.append(Paragraph(summary, body))
+            score_data = [
+                ["Relevance", "Credibility", "Opportunity", "Composite"],
+                [
+                    _score_bar(article.get("relevance_score", 0)),
+                    _score_bar(article.get("credibility_score", 0)),
+                    _score_bar(article.get("opportunity_score", 0)),
+                    str(article.get("composite_score", 0)),
+                ],
+            ]
+            score_table = Table(score_data, colWidths=[4 * cm, 4 * cm, 4 * cm, 3 * cm])
+            score_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3a5c")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cccccc")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f7f9fc"), colors.white]),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(Spacer(1, 0.2 * cm))
+            story.append(score_table)
+            story.append(Spacer(1, 0.25 * cm))
 
-        opp_note = article.get("opportunity_note", "")
-        if opp_note:
-            story.append(Paragraph("<b>Why this matters:</b>", label))
-            story.append(Paragraph(opp_note, body))
+            summary = article.get("summary", article.get("description", ""))
+            if summary:
+                story.append(Paragraph("<b>Summary:</b>", label))
+                story.append(Paragraph(summary, body))
 
-        monetise = article.get("monetisation", "")
-        if monetise:
-            story.append(Paragraph("<b>💰 How to Monetise:</b>", label))
-            story.append(Paragraph(monetise, monetise_style))
+            opp_note = article.get("opportunity_note", "")
+            if opp_note:
+                story.append(Paragraph("<b>Why this matters:</b>", label))
+                story.append(Paragraph(opp_note, body))
 
-        action_plan = article.get("action_plan", "")
-        if action_plan:
-            action_style = ParagraphStyle(
-                "ActionPlan",
-                parent=styles["Normal"],
-                fontSize=10,
-                leading=14,
-                textColor=colors.HexColor("#1a3a5c"),
-                backColor=colors.HexColor("#fff8e1"),
-                spaceAfter=8,
-                leftIndent=8,
-                rightIndent=8,
-                borderPad=6,
-            )
-            story.append(Paragraph("<b>🎯 Action Plan:</b>", label))
-            story.append(Paragraph(action_plan, action_style))
+            monetise = article.get("monetisation", "")
+            if monetise:
+                story.append(Paragraph("<b>💰 How to Monetise:</b>", label))
+                story.append(Paragraph(monetise, monetise_style))
 
-        story.append(Spacer(1, 0.3 * cm))
+            action_plan = article.get("action_plan", "")
+            if action_plan:
+                action_style = ParagraphStyle(
+                    "ActionPlan",
+                    parent=styles["Normal"],
+                    fontSize=10,
+                    leading=14,
+                    textColor=colors.HexColor("#1a3a5c"),
+                    backColor=colors.HexColor("#fff8e1"),
+                    spaceAfter=8,
+                    leftIndent=8,
+                    rightIndent=8,
+                    borderPad=6,
+                )
+                story.append(Paragraph("<b>🎯 Action Plan:</b>", label))
+                story.append(Paragraph(action_plan, action_style))
+
+            contact_targets = article.get("contact_targets", "")
+            if contact_targets:
+                story.append(Paragraph("<b>🏢 Who to Contact First:</b>", label))
+                story.append(Paragraph(contact_targets, contact_style))
+
+            pitch_angle = article.get("pitch_angle", "")
+            if pitch_angle:
+                story.append(Paragraph("<b>✉️ Cold Outreach Opener:</b>", label))
+                story.append(Paragraph(pitch_angle, pitch_style))
+
+            story.append(Spacer(1, 0.3 * cm))
+
+    # Section 1: India Trade News → Europe
+    story.append(Paragraph("🇮🇳 India Trade News → Europe", section_banner))
+    story.append(Paragraph(
+        "Opportunities where India exports to EU / Germany imports from India.",
+        body,
+    ))
+    if india_eu:
+        _render_articles(india_eu, start_rank=1)
+    else:
+        story.append(Paragraph("No India→EU articles in today's digest.", body))
+
+    # Section 2: EU Trade News → India & Asia
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(Paragraph("🇪🇺 EU Trade News → India & Asia", section_banner))
+    story.append(Paragraph(
+        "Opportunities where Germany/EU exports to India or enters Asian markets.",
+        body,
+    ))
+    if eu_india:
+        _render_articles(eu_india, start_rank=len(india_eu) + 1)
+    else:
+        story.append(Paragraph("No EU→India articles in today's digest.", body))
 
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a3a5c")))
     story.append(Spacer(1, 0.3 * cm))
@@ -237,7 +325,7 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
     story.append(Paragraph("Raaya Global UG", footer_style))
     story.append(Paragraph('<link href="https://www.raayaglobal.de">www.raayaglobal.de</link>', footer_style))
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph("Generated automatically by Trade Intelligence | Powered by Grok AI", footer_muted))
+    story.append(Paragraph("Generated automatically by Trade Intelligence | Powered by Groq AI", footer_muted))
 
     doc.build(story)
 
@@ -250,9 +338,9 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
 
 # ── HTML email body ───────────────────────────────────────────────────────────
 
-def _build_html(articles: list[dict], executive_summary: str = "") -> str:
+def _render_article_rows(article_list: list[dict], start_rank: int) -> str:
     rows = ""
-    for rank, a in enumerate(articles, start=1):
+    for rank, a in enumerate(article_list, start=start_rank):
         url = a.get("url", "#")
         monetise_html = (
             f'<div style="background:#f0faf3;border-left:3px solid #27ae60;'
@@ -265,6 +353,18 @@ def _build_html(articles: list[dict], executive_summary: str = "") -> str:
             f'padding:8px 12px;margin-top:8px;color:#1a3a5c;font-size:13px;">'
             f'<b>🎯 Action Plan:</b><br>{a.get("action_plan","")}</div>'
             if a.get("action_plan") else ""
+        )
+        contact_html = (
+            f'<div style="background:#f0f4fb;border-left:3px solid #1a3a5c;'
+            f'padding:8px 12px;margin-top:8px;color:#1a3a5c;font-size:13px;">'
+            f'<b>🏢 Who to Contact First:</b><br>{a.get("contact_targets","")}</div>'
+            if a.get("contact_targets") else ""
+        )
+        pitch_html = (
+            f'<div style="background:#fdf0f8;border-left:3px solid #c0397a;'
+            f'padding:8px 12px;margin-top:8px;color:#5c1a3a;font-size:13px;">'
+            f'<b>✉️ Cold Outreach Opener:</b><br><em>{a.get("pitch_angle","")}</em></div>'
+            if a.get("pitch_angle") else ""
         )
         rows += f"""
         <tr>
@@ -283,11 +383,39 @@ def _build_html(articles: list[dict], executive_summary: str = "") -> str:
             </table>
             {monetise_html}
             {action_html}
+            {contact_html}
+            {pitch_html}
             <div style="margin-top:8px;font-size:11px;">
               <a href="{url}" style="color:#1155cc;">Read full article →</a>
             </div>
           </td>
         </tr>"""
+    return rows
+
+
+def _build_html(articles: list[dict], executive_summary: str = "") -> str:
+    india_eu, eu_india = _split_by_direction(articles)
+
+    section1_rows = _render_article_rows(india_eu, start_rank=1)
+    section2_rows = _render_article_rows(eu_india, start_rank=len(india_eu) + 1)
+
+    section1_html = f"""
+        <tr><td style="padding:12px 32px;background:#1a3a5c;">
+          <div style="color:#fff;font-size:17px;font-weight:bold;">🇮🇳 India Trade News → Europe</div>
+          <div style="color:#a8c4e0;font-size:12px;margin-top:2px;">India exports to EU / Germany imports from India</div>
+        </td></tr>
+        <tr><td>
+          <table width="100%" cellpadding="0" cellspacing="0">{section1_rows if section1_rows else '<tr><td style="padding:16px;color:#888;">No India→EU articles today.</td></tr>'}</table>
+        </td></tr>"""
+
+    section2_html = f"""
+        <tr><td style="padding:12px 32px;background:#2c5f8a;">
+          <div style="color:#fff;font-size:17px;font-weight:bold;">🇪🇺 EU Trade News → India &amp; Asia</div>
+          <div style="color:#a8c4e0;font-size:12px;margin-top:2px;">Germany/EU exports to India or enters Asian markets</div>
+        </td></tr>
+        <tr><td>
+          <table width="100%" cellpadding="0" cellspacing="0">{section2_rows if section2_rows else '<tr><td style="padding:16px;color:#888;">No EU→India articles today.</td></tr>'}</table>
+        </td></tr>"""
 
     return f"""<!DOCTYPE html>
 <html>
@@ -301,15 +429,14 @@ def _build_html(articles: list[dict], executive_summary: str = "") -> str:
           <div style="color:#a8c4e0;font-size:14px;margin-top:4px;">India – Europe &nbsp;|&nbsp; {_date_str()}</div>
         </td></tr>
         <tr><td style="padding:16px 32px;background:#f0f4f8;font-size:13px;color:#555;">
-          Top <b>{len(articles)}</b> opportunities ranked by AI composite score. Full report attached as PDF.
+          Top <b>{len(articles)}</b> opportunities ranked by AI composite score, grouped by trade direction. Full report attached as PDF.
         </td></tr>
         {f'''<tr><td style="padding:16px 32px;background:#eef4fb;border-left:4px solid #1a3a5c;">
           <div style="font-size:13px;font-weight:bold;color:#1a3a5c;margin-bottom:8px;">📋 Executive Briefing</div>
           <div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-line;">{executive_summary}</div>
         </td></tr>''' if executive_summary else ''}
-        <tr><td>
-          <table width="100%" cellpadding="0" cellspacing="0">{rows}</table>
-        </td></tr>
+        {section1_html}
+        {section2_html}
         <tr><td style="padding:24px 32px;background:#f0f4f8;border-top:1px solid #dde3ea;">
           <div style="font-size:13px;color:#333;line-height:1.8;">
             With Best Regards,<br>
@@ -319,7 +446,7 @@ def _build_html(articles: list[dict], executive_summary: str = "") -> str:
             <a href="https://www.raayaglobal.de" style="color:#1a3a5c;">www.raayaglobal.de</a>
           </div>
           <div style="margin-top:12px;font-size:10px;color:#aaa;">
-            Generated automatically · Powered by Grok AI · See attached PDF for full report with clickable links
+            Generated automatically · Powered by Groq AI · See attached PDF for full report with clickable links
           </div>
         </td></tr>
       </table>
