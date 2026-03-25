@@ -211,7 +211,7 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
                 section_header,
             ))
 
-            direction_badge = _esc(article.get("trade_direction", ""))
+            direction_badge = _esc(article.get("trade_direction", "")).replace("→", "->")
             story.append(Paragraph(
                 f"Source: <b>{_esc(article.get('source', 'Unknown'))}</b> &nbsp;|&nbsp; "
                 f"Published: {_esc(article.get('published_at', 'N/A')[:10])}"
@@ -292,7 +292,7 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
             story.append(Spacer(1, 0.3 * cm))
 
     # Section 1: India Trade News → Europe
-    story.append(Paragraph("🇮🇳 India Trade News → Europe", section_banner))
+    story.append(Paragraph("🇮🇳 India Trade News -> Europe", section_banner))
     story.append(Paragraph(
         "Opportunities where India exports to EU / Germany imports from India.",
         body,
@@ -304,7 +304,7 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
 
     # Section 2: EU Trade News → India & Asia
     story.append(Spacer(1, 0.5 * cm))
-    story.append(Paragraph("🇪🇺 EU Trade News → India &amp; Asia", section_banner))
+    story.append(Paragraph("🇪🇺 EU Trade News -> India &amp; Asia", section_banner))
     story.append(Paragraph(
         "Opportunities where Germany/EU exports to India or enters Asian markets.",
         body,

@@ -52,6 +52,11 @@ def run() -> None:
         print("No articles found. Exiting.")
         return
 
+    MAX_TO_SCORE = 60
+    if len(unique_articles) > MAX_TO_SCORE:
+        print(f"Capping to {MAX_TO_SCORE} articles before scoring (was {len(unique_articles)}).")
+        unique_articles = unique_articles[:MAX_TO_SCORE]
+
     # 3. Score
     print(f"\n[Step 3] Scoring {len(unique_articles)} articles with Grok AI...")
     scored_articles = grok_analyzer.score_all(unique_articles)

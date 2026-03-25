@@ -43,4 +43,5 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           RECIPIENT_CC: ${{ secrets.RECIPIENT_CC }}
+          PYTHONUNBUFFERED: "1"
         run: python main.py
