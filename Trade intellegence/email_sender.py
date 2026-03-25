@@ -263,6 +263,8 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
                 story.append(Paragraph(_esc(monetise), monetise_style))
 
             action_plan = article.get("action_plan", "")
+            if isinstance(action_plan, list):
+                action_plan = "\n".join(str(x) for x in action_plan)
             if action_plan:
                 action_style = ParagraphStyle(
                     "ActionPlan",
@@ -280,11 +282,15 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
                 story.append(Paragraph(_esc(action_plan), action_style))
 
             contact_targets = article.get("contact_targets", "")
+            if isinstance(contact_targets, list):
+                contact_targets = "\n".join(str(x) for x in contact_targets)
             if contact_targets:
                 story.append(Paragraph("<b>🏢 Who to Contact First:</b>", label))
                 story.append(Paragraph(_esc(contact_targets), contact_style))
 
             pitch_angle = article.get("pitch_angle", "")
+            if isinstance(pitch_angle, list):
+                pitch_angle = "\n".join(str(x) for x in pitch_angle)
             if pitch_angle:
                 story.append(Paragraph("<b>✉️ Cold Outreach Opener:</b>", label))
                 story.append(Paragraph(_esc(pitch_angle), pitch_style))
@@ -343,6 +349,15 @@ def _render_article_rows(article_list: list[dict], start_rank: int) -> str:
     rows = ""
     for rank, a in enumerate(article_list, start=start_rank):
         url = a.get("url", "#")
+        _ap = a.get("action_plan", "")
+        if isinstance(_ap, list):
+            a = {**a, "action_plan": "\n".join(str(x) for x in _ap)}
+        _ct = a.get("contact_targets", "")
+        if isinstance(_ct, list):
+            a = {**a, "contact_targets": "\n".join(str(x) for x in _ct)}
+        _pa = a.get("pitch_angle", "")
+        if isinstance(_pa, list):
+            a = {**a, "pitch_angle": "\n".join(str(x) for x in _pa)}
         monetise_html = (
             f'<div style="background:#f0faf3;border-left:3px solid #27ae60;'
             f'padding:8px 12px;margin-top:8px;color:#1a5c2a;font-size:13px;">'
