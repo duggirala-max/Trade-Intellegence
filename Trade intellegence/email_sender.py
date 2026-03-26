@@ -203,6 +203,11 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
 
     def _render_articles(article_list: list[dict], start_rank: int) -> None:
         for rank, article in enumerate(article_list, start=start_rank):
+            for _f in ("title", "source", "published_at", "description", "trade_direction",
+                       "summary", "opportunity_note", "monetisation", "action_plan",
+                       "contact_targets", "pitch_angle"):
+                if isinstance(article.get(_f), list):
+                    article[_f] = "\n".join(str(x) for x in article[_f])
             story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
             story.append(Spacer(1, 0.2 * cm))
 
