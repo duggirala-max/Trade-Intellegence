@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────
+# Duggirala
+# German Daily Learning System
+# ─────────────────────────────────────────
+
+name: Daily German Lesson
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'   # 7am CET  (UTC+1 winter)
+    - cron: '0 5 * * 1-5'   # 7am CEST (UTC+2 summer)
+    # Berlin timezone guard in main.py rejects the duplicate run
+  workflow_dispatch:
+
+jobs:
+  send-lesson:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # required for bot git push
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: Send daily German lesson
+        env:
+          GEMINI_API_KEY:  ${{ secrets.GEMINI_API_KEY }}
+          SENDER_EMAIL:    ${{ secrets.SENDER_EMAIL }}
+          SENDER_APP_PASS: ${{ secrets.SENDER_APP_PASS }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: python main.py
