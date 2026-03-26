@@ -248,16 +248,22 @@ def build_pdf(articles: list[dict], executive_summary: str = "") -> bytes:
             story.append(Spacer(1, 0.25 * cm))
 
             summary = article.get("summary", article.get("description", ""))
+            if isinstance(summary, list):
+                summary = "\n".join(str(x) for x in summary)
             if summary:
                 story.append(Paragraph("<b>Summary:</b>", label))
                 story.append(Paragraph(_esc(summary), body))
 
             opp_note = article.get("opportunity_note", "")
+            if isinstance(opp_note, list):
+                opp_note = "\n".join(str(x) for x in opp_note)
             if opp_note:
                 story.append(Paragraph("<b>Why this matters:</b>", label))
                 story.append(Paragraph(_esc(opp_note), body))
 
             monetise = article.get("monetisation", "")
+            if isinstance(monetise, list):
+                monetise = "\n".join(str(x) for x in monetise)
             if monetise:
                 story.append(Paragraph("<b>💰 How to Monetise:</b>", label))
                 story.append(Paragraph(_esc(monetise), monetise_style))
